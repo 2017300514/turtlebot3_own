@@ -1,0 +1,62 @@
+# 使用官方的 ROS Kinetic 基础镜像
+FROM ros:kinetic-robot-xenial
+
+# 设置apt-get为非交互式
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 更新并安装系统依赖项
+RUN apt-get update && apt-get install -y \
+    python-rosdep \
+    python-rosinstall \
+    python-rosinstall-generator \
+    python-wstool \
+    build-essential \
+    python-pip \
+    libhdf5-serial-dev \
+    software-properties-common \
+    python3.7 \
+    python3.7-dev \
+    python3-pip \
+    -qq
+
+# 安装Python 2.7 库（如果需要，虽然TensorFlow会用Python 3）
+RUN pip install --upgrade pip
+
+# 安装 Python 3 虚拟环境
+RUN pip3 install virtualenv
+
+# 设置 ROS 工作区
+WORKDIR /catkin_ws/src
+COPY . /catkin_ws/src/turtlebot3_ddpg_collision_avoidance
+
+# 编译 ROS 包 (使用默认的 Python 2.7)
+WORKDIR /catkin_ws
+RUN /bin/bash -c "source /opt/ros/kinetic/setup.bash && \
+    catkin_make"
+
+# 创建并激活 Python 3.7 虚拟环境
+WORKDIR /catkin_ws/src/turtlebot3_ddpg_collision_avoidance/
+RUN virtualenv -p python3.7 venv_py3
+ENV VIRTUAL_ENV=/catkin_ws/src/turtlebot3_ddpg_collision_avoidance/venv_py3
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# 在虚拟环境中安装 Python 3.7 库
+RUN /bin/bash -c "source venv_py3/bin/activate && \
+    pip install --upgrade pip && \
+    pip install \
+    tensorflow-gpu==1.14.0 \
+    Keras==2.3.1 \
+    numpy==1.16.6 \
+    Pyvisgraph \
+    NetworkX \
+    Shapely \
+    scipy \
+    matplotlib \
+    termcolor \
+    visilibity"
+
+# 设置环境变量
+RUN echo "export TURTLEBOT3_MODEL=waffle_pi" >> ~/.bashrc
+
+# 设置容器启动时自动加载ROS环境
+CMD ["/bin/bash", "-c", "source /opt/ros/kinetic/setup.bash && source /catkin_ws/devel/setup.bash && /bin/bash"]
